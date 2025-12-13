@@ -1,7 +1,6 @@
-// Manually declare process.env for the client-side code
-declare const process: {
-  env: {
+declare namespace NodeJS {
+  interface ProcessEnv {
     API_KEY: string;
     [key: string]: string | undefined;
-  };
-};
+  }
+}

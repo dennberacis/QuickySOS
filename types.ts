@@ -12,12 +12,27 @@ export interface Coordinates {
   longitude: number;
 }
 
+export type Gender = 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+
+export interface UserProfile {
+  name: string;
+  gender: Gender;
+}
+
+export interface SOSLogEntry {
+  id: string;
+  type: EmergencyType;
+  timestamp: Date;
+  location: Coordinates | null;
+}
+
 export interface NearbyAlert {
   id: string;
   type: EmergencyType;
   distance: number; // in meters
   timestamp: Date;
   location: Coordinates;
+  userProfile?: UserProfile;
 }
 
 export interface Contact {

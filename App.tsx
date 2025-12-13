@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EmergencyType, NearbyAlert, GeminiAdviceResponse, UserSettings, Contact } from './types';
+import { EmergencyType, NearbyAlert, GeminiAdviceResponse, UserSettings, Contact, UserProfile, SOSLogEntry } from './types';
 import LiveMap from './components/LiveMap';
 import GestureManager from './components/GestureManager';
 import SettingsModal from './components/SettingsModal';
 import ContactsModal from './components/ContactsModal';
+import ProfileModal from './components/ProfileModal';
 import StealthOverlay from './components/StealthOverlay';
+import NotificationToast, { Notification, NotificationType } from './components/NotificationToast';
 import { getEmergencyAdvice } from './services/geminiService';
 
 // SVG Icons
@@ -16,23 +18,31 @@ const Icons = {
   EyeOff: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>,
   MapPin: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
   Cog: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-  Phone: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+  Phone: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>,
+  User: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
 };
 
 const App: React.FC = () => {
   const [isSOSActive, setIsSOSActive] = useState(false);
-  const [sosCountdown, setSosCountdown] = useState<number | null>(null);
   const [stealthMode, setStealthMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isContactsOpen, setIsContactsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showSafeConfirmation, setShowSafeConfirmation] = useState(false);
   const [emergencyType, setEmergencyType] = useState<EmergencyType | null>(null);
   const [location, setLocation] = useState<{ lat: number; long: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [nearbyAlerts, setNearbyAlerts] = useState<NearbyAlert[]>([]);
   const [advice, setAdvice] = useState<GeminiAdviceResponse | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [alertFlash, setAlertFlash] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile>({ name: '', gender: 'Prefer not to say' });
+  const [sosHistory, setSosHistory] = useState<SOSLogEntry[]>([]);
   
+  // Track the ID of the alert we broadcasted so we can delete it later
+  const [myRemoteAlertId, setMyRemoteAlertId] = useState<string | null>(null);
+
   const [settings, setSettings] = useState<UserSettings>({
     enableShake: true,
     enableSwipeS: true,
@@ -52,8 +62,27 @@ const App: React.FC = () => {
   const sirenGainRef = useRef<GainNode | null>(null);
   const sirenTimeoutRef = useRef<number | null>(null);
 
+  // Track processed alerts to prevent duplicate notifications during polling
+  const processedAlertIds = useRef<Set<string>>(new Set());
+
+  // Ref to track notifications for interval closure access
+  const notificationsRef = useRef<Notification[]>([]);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  // Notification Helper
+  const showNotification = useCallback((message: string, type: NotificationType = 'info') => {
+    const id = Date.now().toString() + Math.random().toString();
+    setNotifications(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   const stopSiren = useCallback(() => {
-    // Clear 30s timeout if active
+    // Clear 5m timeout if active
     if (sirenTimeoutRef.current) {
       window.clearTimeout(sirenTimeoutRef.current);
       sirenTimeoutRef.current = null;
@@ -84,7 +113,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // High Volume Ambulance Siren with 30s Timeout
+  // High Volume Ambulance Siren with 5 Minute Timeout
   const playSiren = useCallback(() => {
     if (!settings.enableAlertSound) return;
     try {
@@ -134,63 +163,107 @@ const App: React.FC = () => {
       sirenOscillatorRef.current = osc;
       sirenGainRef.current = gain;
 
-      // Auto stop after 30 seconds
+      // Auto stop after 5 minutes (300,000ms)
       sirenTimeoutRef.current = window.setTimeout(() => {
         stopSiren();
-      }, 30000);
+      }, 300000);
 
     } catch (e) {
       console.error("Audio playback failed", e);
     }
   }, [settings.enableAlertSound, stopSiren]);
 
-  // Mock Nearby Data
+  // Real-time API Polling for Alerts
   useEffect(() => {
     if (!settings.enableIncomingAlerts) {
       setNearbyAlerts([]);
       return;
     }
 
-    const mockAlerts: NearbyAlert[] = [
-      { id: '1', type: EmergencyType.ACCIDENT, distance: 350, timestamp: new Date(), location: { latitude: 0, longitude: 0 } },
-      { id: '2', type: EmergencyType.MEDICAL, distance: 800, timestamp: new Date(), location: { latitude: 0, longitude: 0 } },
-    ];
-    setNearbyAlerts(mockAlerts);
-    
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) {
-        const newAlert = { 
-          id: Math.random().toString(36).substr(2, 9), 
-          type: Math.random() > 0.5 ? EmergencyType.VIOLENCE : EmergencyType.HARASSMENT, 
-          distance: Math.floor(Math.random() * 1000) + 100, 
-          timestamp: new Date(), 
-          location: { latitude: 0, longitude: 0 } 
-        };
-        setNearbyAlerts(prev => [newAlert, ...prev].slice(0, 5));
-        
-        // Trigger Incoming Alert Sound (Use main Siren)
-        playSiren();
-        setAlertFlash(true);
-        setTimeout(() => setAlertFlash(false), 500);
+    const fetchAlerts = async () => {
+      try {
+        // Poll the serverless API
+        const response = await fetch('/api/alerts');
+        if (response.ok) {
+          const alerts: NearbyAlert[] = await response.json();
+          setNearbyAlerts(alerts);
+
+          // STOP SIREN CHECK:
+          // If there are no active alerts remotely, and we are not locally signaling SOS, stop the noise.
+          // This handles the case where the victim marks themselves safe.
+          if (alerts.length === 0 && !isSOSActive) {
+            stopSiren();
+            // Clear any sticking alert toasts
+            setNotifications(prev => prev.filter(n => n.type !== 'alert'));
+          }
+
+          // Process new alerts
+          alerts.forEach(alert => {
+            // Check if alert is new and NOT generated by self (assuming we'd have a tracking ID, but for now just check processed set)
+            if (!processedAlertIds.current.has(alert.id)) {
+              processedAlertIds.current.add(alert.id);
+              
+              // Only trigger intrusive alert if no other notification is currently blocking view
+              // to prevent stacking spam.
+              if (notificationsRef.current.length === 0) {
+                 playSiren();
+                 setAlertFlash(true);
+                 setTimeout(() => setAlertFlash(false), 500);
+                 showNotification(`⚠️ ${alert.type} reported nearby!`, 'alert');
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Failed to poll alerts", e);
       }
-    }, 10000);
+    };
+
+    // Initial fetch
+    fetchAlerts();
+
+    // Poll every 3 seconds
+    const interval = setInterval(fetchAlerts, 3000);
 
     return () => clearInterval(interval);
-  }, [settings.enableIncomingAlerts, playSiren]);
+  }, [settings.enableIncomingAlerts, playSiren, stopSiren, isSOSActive, showNotification]);
 
   // Location Tracking
   useEffect(() => {
+    let watchId: number | undefined;
+
     if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition(
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 20000,     // Wait up to 20s for a reading
+        maximumAge: 10000   // Reuse last reading if it's less than 10s old
+      };
+
+      watchId = navigator.geolocation.watchPosition(
         (position) => {
           setLocation({
             lat: position.coords.latitude,
             long: position.coords.longitude
           });
+          setLocationError(null);
         },
-        (error) => console.error("Location error", error),
-        { enableHighAccuracy: true }
+        (error) => {
+          console.error("Location error", error);
+          let errorMsg = "Location unavailable";
+          if (error.code === error.PERMISSION_DENIED) {
+            errorMsg = "Permission denied";
+            // Do not continuously spam notification, reliance on map text
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            errorMsg = "GPS Signal unavailable";
+          } else if (error.code === error.TIMEOUT) {
+            errorMsg = "GPS Timeout";
+          }
+          setLocationError(errorMsg);
+        },
+        options
       );
+    } else {
+      setLocationError("Not supported");
     }
     
     const handleOnline = () => setIsOffline(false);
@@ -198,6 +271,7 @@ const App: React.FC = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
+      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -211,46 +285,88 @@ const App: React.FC = () => {
     
     // Play Loud Siren
     playSiren();
+    showNotification(`SOS Signal Broadcasted for ${type}!`, 'alert');
+
+    if (locationError) {
+      showNotification(`Warning: ${locationError}`, 'info');
+    }
+
+    // Add to history
+    const newLogEntry: SOSLogEntry = {
+      id: Date.now().toString(),
+      type,
+      timestamp: new Date(),
+      location: location ? { latitude: location.lat, longitude: location.long } : null
+    };
+    setSosHistory(prev => [newLogEntry, ...prev]);
+
+    // 1. BROADCAST ALERT: Send to Serverless API for other users
+    try {
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          distance: 0, // In a real app, backend calculates distance
+          location: location || { latitude: 0, longitude: 0 },
+          userProfile // Include user profile in broadcast
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Save the ID so we can delete it later when we mark safe
+        setMyRemoteAlertId(data.id);
+      }
+    } catch (e) {
+      console.error("Failed to broadcast SOS to server", e);
+    }
     
     if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
 
     setAdvice(null);
+    
+    // Fetch offline advice immediately
     const aiResponse = await getEmergencyAdvice(type, location ? `Lat: ${location.lat}, Long: ${location.long}` : 'Unknown Location');
     setAdvice(aiResponse);
 
-  }, [location, playSiren]);
+  }, [location, playSiren, userProfile, locationError, showNotification]);
 
   const handleSOSClick = () => {
     if (isSOSActive) return;
-    setSosCountdown(3);
+    triggerSOS(EmergencyType.GENERAL);
   };
 
-  useEffect(() => {
-    if (sosCountdown === null) return;
-    if (sosCountdown <= 0) {
-      triggerSOS(EmergencyType.GENERAL);
-      setSosCountdown(null);
-      return;
-    }
-    const timer = setTimeout(() => setSosCountdown(sosCountdown - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [sosCountdown, triggerSOS]);
-
-  const cancelSOS = () => {
+  const cancelSOS = async () => {
     stopSiren();
-    setSosCountdown(null);
     setIsSOSActive(false);
     setEmergencyType(null);
     setAdvice(null);
     setShowSafeConfirmation(false);
+    showNotification('Emergency Alert Cancelled', 'info');
+
+    // Remove the alert from the server so others stop hearing the siren
+    if (myRemoteAlertId) {
+      try {
+        await fetch('/api/alerts', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: myRemoteAlertId })
+        });
+        setMyRemoteAlertId(null);
+      } catch (e) {
+        console.error("Failed to delete alert", e);
+      }
+    }
   };
 
   const handleAddContact = (contact: Contact) => {
     setContacts(prev => [...prev, contact]);
+    showNotification(`${contact.name} added to emergency contacts`, 'success');
   };
 
   const handleRemoveContact = (id: string) => {
     setContacts(prev => prev.filter(c => c.id !== id));
+    showNotification('Contact removed', 'info');
   };
 
   // Render Stealth Mode
@@ -272,6 +388,15 @@ const App: React.FC = () => {
       <div 
         className={`fixed inset-0 bg-red-600 z-[60] pointer-events-none transition-opacity duration-300 ${alertFlash ? 'opacity-40' : 'opacity-0'}`} 
       />
+
+      {/* Notification Container (Top) */}
+      <div className="fixed top-20 left-0 right-0 z-[100] px-4 flex flex-col items-center pointer-events-none">
+        {notifications.map(n => (
+          <div key={n.id} className="pointer-events-auto w-full flex justify-center">
+            <NotificationToast notification={n} onClose={removeNotification} />
+          </div>
+        ))}
+      </div>
 
       {/* Safe Confirmation Modal */}
       {showSafeConfirmation && (
@@ -304,6 +429,8 @@ const App: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)} 
         settings={settings}
         onSettingsChange={setSettings}
+        sosHistory={sosHistory}
+        onClearHistory={() => setSosHistory([])}
       />
 
       <ContactsModal 
@@ -312,6 +439,13 @@ const App: React.FC = () => {
         contacts={contacts}
         onAddContact={handleAddContact}
         onRemoveContact={handleRemoveContact}
+      />
+
+      <ProfileModal 
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        profile={userProfile}
+        onSave={setUserProfile}
       />
 
       {/* Header */}
@@ -325,6 +459,13 @@ const App: React.FC = () => {
             title="Stealth Mode (Screen Off Gesture)"
           >
             <Icons.EyeOff />
+          </button>
+          <button 
+            onClick={() => setIsProfileOpen(true)}
+            className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition"
+            title="User Identity"
+          >
+            <Icons.User />
           </button>
           <button 
             onClick={() => setIsContactsOpen(true)}
@@ -368,15 +509,9 @@ const App: React.FC = () => {
             </div>
           ) : (
             <div className="relative">
-              {sosCountdown !== null && (
-                 <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                   <span className="text-6xl font-black text-white">{sosCountdown}</span>
-                 </div>
-              )}
               <button 
                 onClick={handleSOSClick}
-                onMouseLeave={() => setSosCountdown(null)}
-                className={`w-56 h-56 rounded-full bg-gradient-to-br from-red-600 to-red-800 shadow-[0_0_40px_rgba(220,38,38,0.4)] border-8 border-slate-900 flex flex-col items-center justify-center transform transition active:scale-95 active:shadow-inner ${sosCountdown !== null ? 'animate-ping-slow opacity-90' : ''}`}
+                className="w-56 h-56 rounded-full bg-gradient-to-br from-red-600 to-red-800 shadow-[0_0_40px_rgba(220,38,38,0.4)] border-8 border-slate-900 flex flex-col items-center justify-center transform transition active:scale-95 active:shadow-inner"
               >
                 <Icons.Siren />
                 <span className="text-4xl font-black text-white mt-2">SOS</span>
@@ -387,13 +522,15 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* AI Advice Section (Only visible when Alerting) */}
+        {/* Offline Advice Section (Visible when Alerting) */}
         {isSOSActive && (
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="flex items-center gap-2 mb-3">
-               <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-               <h3 className="text-lg font-bold text-blue-100">AI Safety Protocol</h3>
-               <span className="ml-auto text-xs bg-slate-800 px-2 py-1 rounded text-slate-400">Gemini 2.5</span>
+               <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
+               <h3 className="text-lg font-bold text-emerald-100">Emergency Guide</h3>
+               <span className="ml-auto text-xs bg-slate-800 px-2 py-1 rounded text-slate-400">
+                  Offline Mode
+               </span>
              </div>
              
              {advice ? (
@@ -401,7 +538,7 @@ const App: React.FC = () => {
                   <ul className="space-y-2">
                     {advice.steps.map((step, idx) => (
                       <li key={idx} className="flex items-start gap-3 bg-slate-800/50 p-2 rounded-lg">
-                        <span className="bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shrink-0">{idx + 1}</span>
+                        <span className="bg-emerald-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shrink-0">{idx + 1}</span>
                         <span className="text-slate-200 text-sm leading-tight">{step}</span>
                       </li>
                     ))}
@@ -413,7 +550,7 @@ const App: React.FC = () => {
                </div>
              ) : (
                <div className="flex justify-center py-4">
-                 <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                </div>
              )}
           </div>
@@ -447,7 +584,7 @@ const App: React.FC = () => {
              <div className="flex items-center gap-2">
                 <Icons.MapPin />
                 <span className="text-sm font-medium text-slate-300">
-                  {location ? `${location.lat.toFixed(4)}, ${location.long.toFixed(4)}` : 'Locating...'}
+                  {location ? `${location.lat.toFixed(4)}, ${location.long.toFixed(4)}` : (locationError || 'Locating...')}
                 </span>
              </div>
              <span className="text-xs text-slate-500 bg-slate-900 px-2 py-1 rounded">
@@ -462,7 +599,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Nearby Alerts Feed (Optional text backup) */}
+        {/* Nearby Alerts Feed */}
         {settings.enableIncomingAlerts && (
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Recent Activity</h3>
@@ -474,7 +611,7 @@ const App: React.FC = () => {
                   <div key={alert.id} className="bg-slate-800/60 p-3 rounded-lg flex justify-between items-center border-l-2 border-slate-600">
                      <div>
                        <span className="block text-sm font-bold text-white">{alert.type}</span>
-                       <span className="text-xs text-slate-400">{alert.distance}m away</span>
+                       <span className="text-xs text-slate-400">{new Date(alert.timestamp).toLocaleTimeString()} • {alert.distance ? `${alert.distance}m` : 'Nearby'}</span>
                      </div>
                   </div>
                 ))
