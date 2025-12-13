@@ -1,0 +1,8 @@
+{
+  "name": "QuickySOS",
+  "description": "An emergency alert application with gesture control, real-time location tracking, and AI-powered safety advice.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ]
+}
