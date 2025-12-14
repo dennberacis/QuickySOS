@@ -255,7 +255,8 @@ const App: React.FC = () => {
               
               // Only trigger intrusive alert if no other notification is currently blocking view
               // to prevent stacking spam.
-              if (notificationsRef.current.length === 0) {
+              // Also ensure we are not in SOS mode (sender) to prevent self-siren race condition
+              if (notificationsRef.current.length === 0 && !isSOSActive) { 
                  playSiren();
                  setAlertFlash(true);
                  setTimeout(() => setAlertFlash(false), 500);
@@ -339,7 +340,7 @@ const App: React.FC = () => {
     }
     
     // Play Loud Siren - REMOVED for silent alert on sender side
-    playSiren(); 
+    // playSiren(); 
     showNotification(`SOS Signal Broadcasted for ${type}!`, 'alert');
 
     if (locationError) {
