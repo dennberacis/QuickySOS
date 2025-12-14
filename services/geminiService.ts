@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import { EmergencyType, GeminiAdviceResponse } from "../types";
 
 // Offline safety advice database
@@ -40,6 +41,29 @@ const EMERGENCY_ADVICE: Record<EmergencyType, GeminiAdviceResponse> = {
 };
 
 export const getEmergencyAdvice = async (type: EmergencyType, locationContext?: string): Promise<GeminiAdviceResponse> => {
-  // Always return offline advice immediately
+  try {
+    const apiKey = process.env.API_KEY;
+    if (apiKey) {
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = `Provide concise emergency advice for a ${type} situation. User location context: ${locationContext}. Format as JSON with 'steps' (array of strings) and 'safetyTip' (string).`;
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json'
+        }
+      });
+      
+      if (response.text) {
+          const json = JSON.parse(response.text);
+          return json as GeminiAdviceResponse;
+      }
+    }
+  } catch (error) {
+    console.warn("Gemini API Error, using offline fallback", error);
+  }
+  
+  // Fallback to offline advice
   return EMERGENCY_ADVICE[type] || EMERGENCY_ADVICE[EmergencyType.GENERAL];
 };

@@ -18,6 +18,10 @@ const StealthOverlay: React.FC<StealthOverlayProps> = ({ onExit, onSOS, enableSh
   const tapCount = useRef<number>(0);
   const tapTimeout = useRef<number | null>(null);
 
+  // 5-Swipe Exit Logic
+  const swipeExitCount = useRef<number>(0);
+  const swipeExitTimeout = useRef<number | null>(null);
+
   // Long Press Exit Logic
   const longPressTimeout = useRef<number | null>(null);
   const isLongPress = useRef<boolean>(false);
@@ -90,6 +94,33 @@ const StealthOverlay: React.FC<StealthOverlayProps> = ({ onExit, onSOS, enableSh
     // Cancel long press on release
     isLongPress.current = false;
     if (longPressTimeout.current) clearTimeout(longPressTimeout.current);
+
+    // Analyze Trace
+    if (points.current.length > 0) {
+      const start = points.current[0];
+      const end = points.current[points.current.length - 1];
+      const distance = Math.hypot(end.x - start.x, end.y - start.y);
+
+      // --- 5-Swipe Exit Logic ---
+      // If movement is significant (>50px), count as a swipe
+      if (distance > 50) {
+        swipeExitCount.current += 1;
+
+        // Reset swipe counter if no subsequent swipe within 1 second
+        if (swipeExitTimeout.current) clearTimeout(swipeExitTimeout.current);
+        swipeExitTimeout.current = window.setTimeout(() => {
+          swipeExitCount.current = 0;
+        }, 1000);
+
+        if (swipeExitCount.current >= 5) {
+          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+          onExit();
+          swipeExitCount.current = 0;
+          points.current = [];
+          return;
+        }
+      }
+    }
 
     // Detect Configured Gesture
     if (enableSwipeS && points.current.length > 20) {
@@ -215,7 +246,7 @@ const StealthOverlay: React.FC<StealthOverlayProps> = ({ onExit, onSOS, enableSh
       <GestureManager isActive={enableShake} onShake={onSOS} />
       
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-neutral-800 text-center pointer-events-none select-none">
-        <p className="text-xs mb-2 font-mono font-bold text-neutral-900">Hold 2s to Wake</p>
+        <p className="text-xs mb-2 font-mono font-bold text-neutral-900">Hold 2s or Swipe 5x to Wake</p>
         <div className="space-y-1">
           <p className="text-[10px] text-neutral-900 opacity-60">Tap 10x for SOS</p>
           {enableSwipeS && (

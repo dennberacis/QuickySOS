@@ -72,6 +72,36 @@ const App: React.FC = () => {
     notificationsRef.current = notifications;
   }, [notifications]);
 
+  // Unlock AudioContext on first interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(e => console.error("Audio resume failed", e));
+      }
+      // Play a silent buffer to truly unlock
+      try {
+          const buffer = audioContextRef.current.createBuffer(1, 1, 22050);
+          const source = audioContextRef.current.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioContextRef.current.destination);
+          source.start(0);
+      } catch(e) { console.error("Audio unlock buffer failed", e); }
+
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   // Notification Helper
   const showNotification = useCallback((message: string, type: NotificationType = 'info') => {
     const id = Date.now().toString() + Math.random().toString();
@@ -238,8 +268,8 @@ const App: React.FC = () => {
     // Initial fetch
     fetchAlerts();
 
-    // Poll every 3 seconds
-    const interval = setInterval(fetchAlerts, 3000);
+    // Poll every 1 second
+    const interval = setInterval(fetchAlerts, 1000);
 
     return () => clearInterval(interval);
   }, [settings.enableIncomingAlerts, playSiren, stopSiren, isSOSActive, showNotification, myRemoteAlertId]);
