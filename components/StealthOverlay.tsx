@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import GestureManager from './GestureManager';
 import { GestureShape } from '../types';
 
@@ -21,6 +21,16 @@ const StealthOverlay: React.FC<StealthOverlayProps> = ({ onExit, onSOS, enableSh
   // Long Press Exit Logic
   const longPressTimeout = useRef<number | null>(null);
   const isLongPress = useRef<boolean>(false);
+
+  // Auto-clear gesture status to restore full black screen
+  useEffect(() => {
+    if (gestureStatus) {
+      const timer = setTimeout(() => {
+        setGestureStatus('');
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gestureStatus]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // --- 1. Long Press to Exit (Hold 2s) ---
