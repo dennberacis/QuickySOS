@@ -283,8 +283,8 @@ const App: React.FC = () => {
     setEmergencyType(type);
     setStealthMode(false); 
     
-    // Play Loud Siren
-    playSiren();
+    // Play Loud Siren - REMOVED for silent alert on sender side
+    // playSiren(); 
     showNotification(`SOS Signal Broadcasted for ${type}!`, 'alert');
 
     if (locationError) {
@@ -308,7 +308,10 @@ const App: React.FC = () => {
         body: JSON.stringify({
           type,
           distance: 0, // In a real app, backend calculates distance
-          location: location || { latitude: 0, longitude: 0 },
+          // Map local {lat, long} to {latitude, longitude} for consistent API structure
+          location: location 
+            ? { latitude: location.lat, longitude: location.long } 
+            : { latitude: 0, longitude: 0 },
           userProfile // Include user profile in broadcast
         })
       });
@@ -623,8 +626,9 @@ const App: React.FC = () => {
       </main>
 
       {/* Floating Info */}
-      <div className="fixed bottom-0 left-0 right-0 p-2 bg-slate-950/80 backdrop-blur text-center text-[10px] text-slate-500">
-         QuickySOS • {settings.enableShake ? 'Shake Active' : 'Shake Off'} • Stealth Mode Available
+      <div className="fixed bottom-0 left-0 right-0 p-2 bg-slate-950/80 backdrop-blur text-center text-[10px] text-slate-500 flex flex-col justify-center">
+         <span>QuickySOS • {settings.enableShake ? 'Shake Active' : 'Shake Off'} • Stealth Mode Available</span>
+         <span className="opacity-60 mt-0.5">Credits: Denn Marc Beracis & Tom Aniban</span>
       </div>
     </div>
   );

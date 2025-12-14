@@ -170,8 +170,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        <div className="mt-8 pt-4 border-t border-slate-800 flex-shrink-0">
-          <p className="text-[10px] text-center text-slate-500">QuickySOS v1.1 • Privacy Protected</p>
+        <div className="mt-8 pt-4 border-t border-slate-800 flex-shrink-0 text-center">
+          <p className="text-[10px] text-slate-500">QuickySOS v1.1 • Privacy Protected</p>
+          <p className="text-[10px] text-slate-500 mt-1">Created by Denn Marc Beracis & Tom Aniban</p>
         </div>
       </div>
     </div>

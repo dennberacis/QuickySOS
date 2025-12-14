@@ -62,34 +62,32 @@ const LiveMap: React.FC<LiveMapProps> = ({ userLocation, alerts }) => {
         .bindPopup("You are here");
       
       markersRef.current.push(userMarker);
-
-      // Add Alert Markers
-      alerts.forEach(alert => {
-        // Simulate random locations near user for demo since mock data has 0,0
-        // In real app, use alert.location.latitude/longitude
-        const offsetLat = (Math.random() - 0.5) * 0.01;
-        const offsetLng = (Math.random() - 0.5) * 0.01;
-        const lat = userLocation.lat + offsetLat;
-        const lng = userLocation.long + offsetLng;
-
-        let color = '#ef4444'; // Red (Violence)
-        if (alert.type === EmergencyType.ACCIDENT) color = '#eab308'; // Yellow
-        if (alert.type === EmergencyType.MEDICAL) color = '#f97316'; // Orange
-
-        const alertIcon = L.divIcon({
-          className: 'custom-div-icon',
-          html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; animation: pulse 2s infinite;"></div>`,
-          iconSize: [12, 12],
-          iconAnchor: [6, 6]
-        });
-
-        const marker = L.marker([lat, lng], { icon: alertIcon })
-          .addTo(leafletMap.current)
-          .bindPopup(`<b>${alert.type}</b><br>${alert.distance}m away`);
-        
-        markersRef.current.push(marker);
-      });
     }
+
+    // Add Alert Markers using exact coordinates
+    alerts.forEach(alert => {
+      if (!alert.location) return;
+
+      const lat = alert.location.latitude;
+      const lng = alert.location.longitude;
+
+      let color = '#ef4444'; // Red (Violence/General)
+      if (alert.type === EmergencyType.ACCIDENT) color = '#eab308'; // Yellow
+      if (alert.type === EmergencyType.MEDICAL) color = '#f97316'; // Orange
+
+      const alertIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; animation: pulse 2s infinite;"></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+
+      const marker = L.marker([lat, lng], { icon: alertIcon })
+        .addTo(leafletMap.current)
+        .bindPopup(`<b>${alert.type}</b><br>${alert.distance}m away`);
+      
+      markersRef.current.push(marker);
+    });
   }, [userLocation, alerts]);
 
   return <div ref={mapRef} className="w-full h-full min-h-[250px] bg-slate-900 z-0" />;
