@@ -339,7 +339,7 @@ const App: React.FC = () => {
     }
     
     // Play Loud Siren - REMOVED for silent alert on sender side
-    // playSiren(); 
+    playSiren(); 
     showNotification(`SOS Signal Broadcasted for ${type}!`, 'alert');
 
     if (locationError) {
@@ -572,7 +572,6 @@ const App: React.FC = () => {
                </div>
                <button 
                  onClick={() => {
-                   stopSiren();
                    setShowSafeConfirmation(true);
                  }}
                  className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg transform transition active:scale-95 flex items-center gap-2"
